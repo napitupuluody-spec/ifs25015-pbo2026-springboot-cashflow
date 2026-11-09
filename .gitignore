@@ -1,0 +1,24 @@
+# Konfigurasi lokal (jangan di-commit); .env.example tetap di-track
+.env
+
+# Build
+target/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.cursor/
+
+# Vaadin (di-generate)
+node_modules/
+package.json
+package-lock.json
+tsconfig.json
+types.d.ts
+vite.config.ts
+vite.generated.ts
+src/main/frontend/generated/
+src/main/bundles/
+vaadin-dev-server-settings.json
