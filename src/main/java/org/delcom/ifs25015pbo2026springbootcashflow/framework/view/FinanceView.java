@@ -1,22 +1,30 @@
 package org.delcom.ifs25015pbo2026springbootcashflow.framework.view;
 
+import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.HasStyle;
 import com.vaadin.flow.component.Key;
+import com.vaadin.flow.component.Tag;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.ColumnTextAlign;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.html.Header;
 import com.vaadin.flow.component.html.H1;
+import com.vaadin.flow.component.html.Main;
 import com.vaadin.flow.component.html.Paragraph;
+import com.vaadin.flow.component.html.Section;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.dom.Element;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import org.delcom.ifs25015pbo2026springbootcashflow.adapter.presenter.FinancePresenter;
@@ -30,6 +38,7 @@ import org.delcom.ifs25015pbo2026springbootcashflow.usecase.FinanceUseCase;
 import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Tampilan web Cashflow. Semua aturan bisnis didelegasikan ke {@link FinanceUseCase};
@@ -40,15 +49,15 @@ import java.util.List;
 @PageTitle("Cashflow")
 public class FinanceView extends VerticalLayout {
 
-    private static final String COLOR_INCOME = "#16A34A";
-    private static final String COLOR_EXPENSE = "#DC2626";
+    private static final String COLOR_INCOME = "#15803D";
+    private static final String COLOR_EXPENSE = "#B91C1C";
 
     private final FinanceUseCase useCase;
     private final FinancePresenter presenter;
 
     private final Grid<Transaction> grid = new Grid<>(Transaction.class, false);
     private final TextField searchField = new TextField();
-    private final ComboBox<SortOption> sortBox = new ComboBox<>();
+    private final NativeSelect sortSelect = new NativeSelect("Urutkan transaksi", "Urutkan...");
     private final Paragraph statusLabel = new Paragraph();
     private final Span emptyState = new Span();
 
@@ -70,32 +79,55 @@ public class FinanceView extends VerticalLayout {
         setSpacing(true);
 
         configureGrid();
-        add(new H1("Cashflow"), buildSummaryCards(), buildToolbar(), statusLabel, grid);
+
+        // Landmark semantik: <header> + <main> agar lolos aturan axe "region" / "landmark-one-main".
+        Header header = new Header(new H1("Cashflow"));
+        header.getStyle().set("width", "100%");
+
+        statusLabel.getElement().setAttribute("aria-live", "polite");
+        Main main = new Main(buildSummaryCards(), buildToolbar(), statusLabel, grid);
+        main.getStyle().set("display", "flex").set("flex-direction", "column").set("gap", "1rem")
+                .set("width", "100%").set("flex", "1").set("min-height", "0").set("box-sizing", "border-box");
+
+        add(header, main);
+        setFlexGrow(1, main);
         reload();
+    }
+
+    @Override
+    protected void onAttach(AttachEvent attachEvent) {
+        super.onAttach(attachEvent);
+        // Deklarasikan bahasa halaman (axe "html-has-lang" / "html-lang-valid").
+        attachEvent.getUI().getPage().executeJs("document.documentElement.lang = $0", "id");
     }
 
     // ---------- ringkasan ----------
 
-    private HorizontalLayout buildSummaryCards() {
+    private Section buildSummaryCards() {
         HorizontalLayout cards = new HorizontalLayout(
-                summaryCard("Jumlah Transaksi", totalCount, "#DBEAFE", "#1D4ED8"),
-                summaryCard("Total Pemasukan", incomeTotal, "#DCFCE7", COLOR_INCOME),
-                summaryCard("Total Pengeluaran", expenseTotal, "#FEE2E2", COLOR_EXPENSE),
-                summaryCard("Saldo", balanceValue, "#FEF3C7", "#D97706"));
+                summaryCard("Jumlah Transaksi", totalCount, "#DBEAFE", "#1D4ED8", "#1E3A8A"),
+                summaryCard("Total Pemasukan", incomeTotal, "#DCFCE7", COLOR_INCOME, "#14532D"),
+                summaryCard("Total Pengeluaran", expenseTotal, "#FEE2E2", COLOR_EXPENSE, "#7F1D1D"),
+                summaryCard("Saldo", balanceValue, "#FEF3C7", "#D97706", "#78350F"));
         cards.setWidthFull();
-        cards.getStyle().set("align-items", "stretch");
-        return cards;
+        cards.getStyle().set("align-items", "stretch").set("flex-wrap", "wrap");
+        cards.setPadding(false);
+
+        Section section = new Section(cards);
+        section.getElement().setAttribute("aria-label", "Ringkasan keuangan");
+        section.getStyle().set("width", "100%");
+        return section;
     }
 
-    private Div summaryCard(String label, Span value, String background, String accent) {
+    private Div summaryCard(String label, Span value, String background, String accent, String textColor) {
         Span caption = new Span(label);
         caption.getStyle().set("display", "block").set("font-size", "0.875rem")
-                .set("font-weight", "500").set("color", accent);
+                .set("font-weight", "500").set("color", textColor);
         value.getStyle().set("display", "block").set("margin-top", "0.35rem")
-                .set("font-size", "1.6rem").set("font-weight", "700").set("color", accent);
+                .set("font-size", "1.6rem").set("font-weight", "700").set("color", textColor);
 
         Div card = new Div(caption, value);
-        card.getStyle().set("flex", "1").set("min-width", "0").set("background", background)
+        card.getStyle().set("flex", "1 1 180px").set("min-width", "0").set("background", background)
                 .set("border-left", "6px solid " + accent).set("border-radius", "12px")
                 .set("padding", "1rem 1.1rem").set("box-sizing", "border-box");
         return card;
@@ -107,23 +139,23 @@ public class FinanceView extends VerticalLayout {
         incomeTotal.setText(presenter.formatMoney(useCase.getTotalIncome()));
         expenseTotal.setText(presenter.formatMoney(useCase.getTotalExpense()));
         balanceValue.setText(presenter.formatMoney(balance));
-        balanceValue.getStyle().set("color", balance.signum() < 0 ? COLOR_EXPENSE : "#92400E");
+        balanceValue.getStyle().set("color", balance.signum() < 0 ? "#7F1D1D" : "#78350F");
     }
 
     // ---------- toolbar ----------
 
     private HorizontalLayout buildToolbar() {
+        searchField.setLabel("Cari");
         searchField.setPlaceholder("Cari keterangan...");
         searchField.setPrefixComponent(VaadinIcon.SEARCH.create());
-        searchField.setClearButtonVisible(true);
+        searchField.setClearButtonVisible(false);
         searchField.addKeyDownListener(Key.ENTER, event -> applySearch());
 
-        sortBox.setItems(SortOption.values());
-        sortBox.setItemLabelGenerator(presenter::sortLabel);
-        sortBox.setPlaceholder("Urutkan...");
-        sortBox.setClearButtonVisible(true);
-        sortBox.addValueChangeListener(event -> {
-            sortOption = event.getValue();
+        for (SortOption option : SortOption.values()) {
+            sortSelect.addOption(option.name(), presenter.sortLabel(option));
+        }
+        sortSelect.addChangeListener(value -> {
+            sortOption = value.isEmpty() ? null : SortOption.valueOf(value);
             reload();
         });
 
@@ -132,16 +164,23 @@ public class FinanceView extends VerticalLayout {
 
         Button incomeButton = new Button("Tambah Pemasukan", VaadinIcon.PLUS.create(),
                 e -> openAddDialog(TransactionType.INCOME));
-        incomeButton.addThemeVariants(ButtonVariant.LUMO_SUCCESS, ButtonVariant.LUMO_PRIMARY);
+        incomeButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        incomeButton.getStyle().set("background", COLOR_INCOME).set("color", "#FFFFFF");
 
         Button expenseButton = new Button("Tambah Pengeluaran", VaadinIcon.MINUS.create(),
                 e -> openAddDialog(TransactionType.EXPENSE));
-        expenseButton.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_PRIMARY);
+        expenseButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        expenseButton.getStyle().set("background", COLOR_EXPENSE).set("color", "#FFFFFF");
 
         HorizontalLayout toolbar = new HorizontalLayout(
-                searchField, searchButton, sortBox, resetButton, incomeButton, expenseButton);
+                searchField, searchButton, sortSelect, resetButton, incomeButton, expenseButton);
         toolbar.setWidthFull();
+        toolbar.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.END);
         toolbar.setFlexGrow(1, searchField);
+        toolbar.setPadding(false);
+        toolbar.getStyle().set("flex-wrap", "wrap");
+        toolbar.getElement().setAttribute("role", "search");
+        searchField.getStyle().set("min-width", "200px");
         return toolbar;
     }
 
@@ -154,7 +193,7 @@ public class FinanceView extends VerticalLayout {
         keyword = "";
         sortOption = null;
         searchField.clear();
-        sortBox.clear();
+        sortSelect.reset();
         reload();
     }
 
@@ -186,7 +225,9 @@ public class FinanceView extends VerticalLayout {
                 .setAutoWidth(true).setFlexGrow(0);
 
         grid.setEmptyStateComponent(emptyState);
-        grid.setSizeFull();
+        grid.getElement().setAttribute("aria-label", "Daftar transaksi");
+        grid.setWidthFull();
+        grid.getStyle().set("flex", "1").set("min-height", "320px");
     }
 
     private Span typeBadge(Transaction transaction) {
@@ -290,5 +331,42 @@ public class FinanceView extends VerticalLayout {
     private void showError(String message) {
         Notification.show(message, 4000, Notification.Position.BOTTOM_START)
                 .addThemeVariants(NotificationVariant.LUMO_ERROR);
+    }
+
+    /**
+     * Elemen &lt;select&gt; native. Lebih ringan daripada ComboBox (tanpa bundle overlay/virtualizer),
+     * dan nama aksesibelnya jelas lewat aria-label sehingga lolos audit axe/Lighthouse.
+     */
+    @Tag("select")
+    static final class NativeSelect extends Component implements HasStyle {
+
+        NativeSelect(String ariaLabel, String placeholder) {
+            getElement().setAttribute("aria-label", ariaLabel);
+            getStyle().set("box-sizing", "border-box").set("min-height", "2.5rem")
+                    .set("padding", "0.4rem 0.75rem").set("font", "inherit")
+                    .set("color", "#1F2937").set("background", "#FFFFFF")
+                    .set("border", "1px solid #6B7280").set("border-radius", "8px")
+                    .set("min-width", "180px");
+            addOption("", placeholder);
+        }
+
+        void addOption(String value, String text) {
+            Element option = new Element("option");
+            option.setAttribute("value", value);
+            option.setText(text);
+            getElement().appendChild(option);
+        }
+
+        void addChangeListener(Consumer<String> listener) {
+            getElement().addPropertyChangeListener("value", "change", event -> {
+                if (event.isUserOriginated()) {
+                    listener.accept(String.valueOf(event.getValue()));
+                }
+            });
+        }
+
+        void reset() {
+            getElement().setProperty("value", "");
+        }
     }
 }
